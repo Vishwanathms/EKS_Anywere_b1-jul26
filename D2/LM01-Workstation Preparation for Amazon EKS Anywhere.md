@@ -1,8 +1,3 @@
-For a **64-hour enterprise training**, I would not make this just an installation guide. I would make it a **professional enterprise lab manual** that students can refer to even after the course.
-
-I recommend the following structure.
-
----
 
 # Lab Manual 1
 
@@ -404,6 +399,13 @@ curl -L \
 https://anywhere-assets.eks.amazonaws.com/releases/download/${RELEASE}/eksctl-anywhere-$(uname -s)-amd64.tar.gz \
 -o eksctl-anywhere.tar.gz
 ```
+
+```bash
+ARCH=amd64
+
+curl -LO https://anywhere-assets.eks.amazonaws.com/releases/latest/download/eksctl-anywhere-linux-${ARCH}.tar.gz
+```
+
 
 Extract
 
