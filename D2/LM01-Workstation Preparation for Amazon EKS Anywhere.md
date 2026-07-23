@@ -417,6 +417,15 @@ chmod +x eksctl-anywhere
 sudo mv eksctl-anywhere /usr/local/bin/
 ```
 
+```bash
+curl -s https://api.github.com/repos/aws/eks-anywhere/releases/latest | grep tag_name
+
+VERSION=v0.xx.x
+
+curl -L \
+-o eksctl-anywhere.tar.gz \
+https://github.com/aws/eks-anywhere/releases/download/${VERSION}/eksctl-anywhere-linux-amd64.tar.gz
+```
 
 Extract
 
