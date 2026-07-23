@@ -395,7 +395,7 @@ grep gitTag | head -1 | awk '{print $2}')
 Download binary
 
 ```bash
-curl -L -o eksctl-anywhere.tar.gz https://github.com/aws/eks-anywhere/releases/download/v0.25.3/eksctl-anywhere-v0.25.3-darwin-amd64.tar.gz
+curl -L -o eksctl-anywhere.tar.gz https://github.com/aws/eks-anywhere/releases/download/v0.25.3/eksctl-anywhere-v0.25.3-linux-amd64.tar.gz
 ```
 
 Check if the downloaded tar is fine
