@@ -395,36 +395,17 @@ grep gitTag | head -1 | awk '{print $2}')
 Download binary
 
 ```bash
-curl -L \
-https://anywhere-assets.eks.amazonaws.com/releases/download/${RELEASE}/eksctl-anywhere-$(uname -s)-amd64.tar.gz \
--o eksctl-anywhere.tar.gz
+curl -L -o eksctl-anywhere.tar.gz https://github.com/aws/eks-anywhere/releases/download/v0.25.3/eksctl-anywhere-v0.25.3-darwin-amd64.tar.gz
 ```
 
+Check if the downloaded tar is fine
 ```bash
-ARCH=amd64
-
-curl -LO https://anywhere-assets.eks.amazonaws.com/releases/latest/download/eksctl-anywhere-linux-${ARCH}.tar.gz
+file eksctl-anywhere.tar.gz
 ```
 
-```bash
-curl -L -o eksctl-anywhere \
-https://github.com/aws/eks-anywhere/releases/latest/download/eksctl-anywhere-linux-amd64
+Exected output
 ```
-
-```bash
-chmod +x eksctl-anywhere
-
-sudo mv eksctl-anywhere /usr/local/bin/
-```
-
-```bash
-curl -s https://api.github.com/repos/aws/eks-anywhere/releases/latest | grep tag_name
-
-VERSION=v0.xx.x
-
-curl -L \
--o eksctl-anywhere.tar.gz \
-https://github.com/aws/eks-anywhere/releases/download/${VERSION}/eksctl-anywhere-linux-amd64.tar.gz
+eksctl-anywhere.tar.gz: gzip compressed data, last modified: Wed Jul 22 10:09:27 2026, from Unix, original size modulo 2^32 99901440
 ```
 
 Extract
