@@ -1,0 +1,107 @@
+apiVersion: anywhere.eks.amazonaws.com/v1alpha1
+kind: Cluster
+metadata:
+  name: production-cluster
+spec:
+  clusterNetwork:
+    cniConfig:
+      cilium: {}
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+    services:
+      cidrBlocks:
+      - 10.96.0.0/12
+  controlPlaneConfiguration:
+    count: 2
+    endpoint:
+      host: "10.10.1.233"
+    machineGroupRef:
+      kind: VSphereMachineConfig
+      name: production-cluster-cp
+  datacenterRef:
+    kind: VSphereDatacenterConfig
+    name: production-cluster
+  externalEtcdConfiguration:
+    count: 3
+    machineGroupRef:
+      kind: VSphereMachineConfig
+      name: production-cluster-etcd
+  kubernetesVersion: "1.35"
+  managementCluster:
+    name: production-cluster
+  workerNodeGroupConfigurations:
+  - count: 2
+    machineGroupRef:
+      kind: VSphereMachineConfig
+      name: production-cluster
+    name: md-0
+
+---
+apiVersion: anywhere.eks.amazonaws.com/v1alpha1
+kind: VSphereDatacenterConfig
+metadata:
+  name: production-cluster
+spec:
+  datacenter: "LAB-DC"
+  insecure: false
+  network: "priv-192.168.1.0"
+  server: "vcenter.vishwacloudlab.in"
+  thumbprint: ""
+
+---
+apiVersion: anywhere.eks.amazonaws.com/v1alpha1
+kind: VSphereMachineConfig
+metadata:
+  name: production-cluster-cp
+spec:
+  datastore: ""
+  diskGiB: 25
+  folder: "Student-student-XX"
+  memoryMiB: 8192
+  numCPUs: 2
+  osFamily: bottlerocket
+  resourcePool: "Student-student-XX-RP"
+  users:
+  - name: ec2-user
+    sshAuthorizedKeys:
+    - ssh-rsa AAAA...
+
+---
+apiVersion: anywhere.eks.amazonaws.com/v1alpha1
+kind: VSphereMachineConfig
+metadata:
+  name: production-cluster
+spec:
+  datastore: ""
+  diskGiB: 25
+  folder: "Student-student-XX"
+  memoryMiB: 8192
+  numCPUs: 2
+  osFamily: bottlerocket
+  resourcePool: "Student-student-XX-RP"
+  users:
+  - name: ec2-user
+    sshAuthorizedKeys:
+    - ssh-rsa AAAA...
+
+---
+apiVersion: anywhere.eks.amazonaws.com/v1alpha1
+kind: VSphereMachineConfig
+metadata:
+  name: production-cluster-etcd
+spec:
+  datastore: ""
+  diskGiB: 25
+  folder: "Student-student-XX"
+  memoryMiB: 8192
+  numCPUs: 2
+  osFamily: bottlerocket
+  resourcePool: "Student-student-XX-RP"
+  users:
+  - name: ec2-user
+    sshAuthorizedKeys:
+    - ssh-rsa AAAA...
+
+---
+

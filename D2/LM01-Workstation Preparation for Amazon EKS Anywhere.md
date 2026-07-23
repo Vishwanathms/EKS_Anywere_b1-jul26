@@ -385,14 +385,8 @@ govc version
 
 # Task 9 – Install Amazon EKS Anywhere CLI
 
-Download
 
-```bash
-RELEASE=$(curl https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest.yaml | \
-grep gitTag | head -1 | awk '{print $2}')
-```
-
-install eksctl
+Install eksctl
 ```bash
 curl --silent --location \
 "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
