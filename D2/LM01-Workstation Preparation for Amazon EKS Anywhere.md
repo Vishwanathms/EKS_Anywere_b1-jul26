@@ -406,6 +406,17 @@ ARCH=amd64
 curl -LO https://anywhere-assets.eks.amazonaws.com/releases/latest/download/eksctl-anywhere-linux-${ARCH}.tar.gz
 ```
 
+```bash
+curl -L -o eksctl-anywhere \
+https://github.com/aws/eks-anywhere/releases/latest/download/eksctl-anywhere-linux-amd64
+```
+
+```bash
+chmod +x eksctl-anywhere
+
+sudo mv eksctl-anywhere /usr/local/bin/
+```
+
 
 Extract
 
