@@ -392,6 +392,16 @@ RELEASE=$(curl https://anywhere-assets.eks.amazonaws.com/releases/eks-a/manifest
 grep gitTag | head -1 | awk '{print $2}')
 ```
 
+install eksctl
+```bash
+curl --silent --location \
+"https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" \
+| tar xz
+
+sudo mv eksctl /usr/local/bin/
+```
+
+
 Download binary
 
 ```bash
