@@ -100,7 +100,7 @@ workerNodeGroupConfigurations:
 
     minCount: 2
 
-    maxCount: 5
+    maxCount: 4
 ```
 
 Save.
