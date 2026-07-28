@@ -79,9 +79,7 @@ workerNodeGroupConfigurations:
   count: 2
 
   autoscalingConfiguration:
-
     minCount: 2
-
     maxCount: 4
 ```
 
