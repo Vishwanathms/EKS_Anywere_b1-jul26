@@ -107,7 +107,7 @@ kubectl get machinedeployment -A
 Describe it
 
 ```bash
-kubectl describe machinedeployment md-0
+kubectl describe machinedeployment production-cluster-lXX-md-0 -n eksa-system | grep size
 ```
 
 Students should verify:
