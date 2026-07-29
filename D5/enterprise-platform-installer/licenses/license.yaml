@@ -1,0 +1,7 @@
+customer: Vishwacloudlab
+licenseId: LAB-2026
+expires: 2027-12-31
+features:
+- MultiCluster
+- Monitoring
+- GitOps
