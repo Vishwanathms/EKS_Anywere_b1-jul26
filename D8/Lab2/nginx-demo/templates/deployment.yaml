@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: {{ include "nginx-demo.fullname" . }}
+
+spec:
+  replicas: {{ .Values.replicas }}
+
+  selector:
+    matchLabels:
+      app: {{ include "nginx-demo.name" . }}
+
+  template:
+
+    metadata:
+      labels:
+        app: {{ include "nginx-demo.name" . }}
+
+    spec:
+
+      containers:
+
+      - name: nginx
+
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+        ports:
+
+        - containerPort: 80
+
+        env:
+
+        - name: COMPANY
+          value: "{{ .Values.company }}"
+
+        - name: APPLICATION
+          value: "{{ .Values.application }}"
+
+        - name: ENVIRONMENT
+          value: "{{ .Values.environment }}"
+
+        - name: VERSION
+          value: "{{ .Values.version }}"
+
+        - name: COLOR_THEME
+          value: "{{ .Values.color }}"
+
+        - name: BUILD_DATE
+          value: "{{ .Values.buildDate }}"
+
+        resources:
+
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+          limits:
+            cpu: 200m
+            memory: 256Mi
