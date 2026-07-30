@@ -339,7 +339,7 @@ vi l2.yaml
 
 ```yaml
 apiVersion: metallb.io/v1beta1
-kind: Layer2Advertisement
+kind: L2Advertisement
 
 metadata:
   name: layer2
