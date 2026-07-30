@@ -103,6 +103,10 @@ spec:
 
 ## Step 4 – Create Service
 
+service.yaml
+
+Create cluster service for nginx
+
 ```yaml
 apiVersion: v1
 kind: Service
