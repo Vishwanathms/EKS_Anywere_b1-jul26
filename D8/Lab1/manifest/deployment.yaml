@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitops-nginx
+  namespace: gitops-demo
+  labels:
+    app: gitops-nginx
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: gitops-nginx
+
+  template:
+    metadata:
+      labels:
+        app: gitops-nginx
+
+    spec:
+      containers:
+      - name: nginx
+
+        image: vishwacloudlab/gitops-nginx:v1
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 80
+
+        env:
+
+        - name: COMPANY
+          value: "Vishwacloudlab"
+
+        - name: APPLICATION
+          value: "GitOps Demo"
+
+        - name: ENVIRONMENT
+          value: "Development"
+
+        - name: VERSION
+          value: "v1.0.0"
+
+        - name: COLOR_THEME
+          value: "Blue"
+
+        - name: BUILD_DATE
+          value: "30-Jul-2026"
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+          limits:
+            cpu: 200m
+            memory: 256Mi
