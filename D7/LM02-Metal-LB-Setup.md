@@ -305,7 +305,7 @@ metadata:
 
 spec:
   addresses:
-  - 192.168.100.240-192.168.100.250
+  - 192.168.1.cluser-IP+1-192.168.1.cluser-IP+3
 ```
 
 Apply
@@ -440,7 +440,7 @@ LoadBalancer
 
 EXTERNAL-IP
 
-192.168.100.240
+192.168.1.240
 ```
 
 ---
@@ -458,7 +458,7 @@ Look for
 ```
 LoadBalancer Ingress
 
-192.168.100.240
+192.168.1.240
 ```
 
 ---
@@ -468,7 +468,7 @@ LoadBalancer Ingress
 From another machine
 
 ```bash
-curl http://192.168.100.240
+curl http://192.168.1.240
 ```
 
 or
@@ -476,7 +476,7 @@ or
 Open Browser
 
 ```
-http://192.168.100.240
+http://192.168.1.240
 ```
 
 Expected
@@ -553,11 +553,11 @@ Example
 ```
 nginx
 
-192.168.100.240
+192.168.1.240
 
 apache
 
-192.168.100.241
+192.168.1.241
 ```
 
 ---
