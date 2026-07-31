@@ -1,0 +1,66 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+
+metadata:
+  name: nginx-environments
+  namespace: argocd
+
+spec:
+
+  generators:
+
+    - git:
+
+        repoURL: https://github.com/Vishwanathms/jul26-eks-anywhere-argocd.git
+
+        revision: main
+
+        directories:
+
+          - path: apps/*
+
+  template:
+
+    metadata:
+
+      name: '{{path.basename}}'
+
+    spec:
+
+      project: gitops-training
+
+      source:
+
+        repoURL: https://github.com/Vishwanathms/jul26-eks-anywhere-argocd.git
+
+        targetRevision: main
+
+        path: helm/nginx-demo
+
+        helm:
+
+          valueFiles:
+
+            - values.yaml
+
+            - ../../apps/{{path.basename}}/values-{{path.basename}}.yaml
+
+      destination:
+
+        server: https://kubernetes.default.svc
+
+        namespace: gitops-{{path.basename}}
+
+      syncPolicy:
+
+        automated:
+
+          prune: true
+
+          selfHeal: true
+
+        syncOptions:
+
+          - CreateNamespace=true
+
+          - ApplyOutOfSyncOnly=true

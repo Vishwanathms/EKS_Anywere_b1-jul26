@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: nginx-demo
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: nginx-demo
+
+  template:
+
+    metadata:
+      labels:
+        app: nginx-demo
+
+    spec:
+
+      containers:
+
+      - name: nginx
+
+        image: nginx:latest
+
+        imagePullPolicy: IfNotPresent
+
+        ports:
+
+        - containerPort: 80
+
+        resources:
+
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+          limits:
+            cpu: 200m
+            memory: 256Mi
+
+        env:
+
+        - name: COMPANY
+          value: Vishwacloudlab
+
+        - name: APPLICATION
+          value: GitOps Demo
+
+        - name: VERSION
+          value: v1.0
+
+        - name: ENVIRONMENT
+          value: BASE
+
+        - name: COLOR
+          value: gray

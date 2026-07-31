@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+
+metadata:
+  name: nginx-demo
+
+spec:
+
+  rules:
+
+  - host: dev-gitops-student-31.lab.local
