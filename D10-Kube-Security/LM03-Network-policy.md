@@ -472,6 +472,35 @@ Expected
 Welcome to nginx!
 ```
 
+But if you get "Bad Address" which means Frontend is not even able to resovle the ip .
+
+Add the below to the egress network policy 
+
+```bash
+egress:
+- to:
+  - podSelector:
+      matchLabels:
+        app: nginx
+
+- to:
+  - namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+
+    podSelector:
+      matchLabels:
+        k8s-app: kube-dns
+
+  ports:
+  - protocol: UDP
+    port: 53
+  - protocol: TCP
+    port: 53
+```
+
+Now we should net the expected output
+
 ---
 
 # Step 15 – Delete Policy
