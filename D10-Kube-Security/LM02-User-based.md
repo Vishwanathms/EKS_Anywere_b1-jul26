@@ -1,4 +1,4 @@
-# LAB 2 – Kubernetes User RBAC (kubectl User)
+# LAB 10.2 – Kubernetes User RBAC (kubectl User)
 
 This lab demonstrates how Kubernetes authenticates external users using client certificates.
 

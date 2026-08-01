@@ -1,13 +1,6 @@
-Yes. For your **EKS Anywhere + ArgoCD** course, RBAC is one of the most important security labs because students need to understand the difference between:
-
-1. **Service Account RBAC** (Applications running inside Kubernetes)
-2. **User RBAC** (Humans using kubectl)
-
-These should be two completely separate labs.
-
 ---
 
-# LAB 1 – Kubernetes RBAC using Service Account
+# LAB 10.1 – Kubernetes RBAC using Service Account
 
 **Module 10 – Kubernetes Security**
 

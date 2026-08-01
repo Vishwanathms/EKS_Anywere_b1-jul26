@@ -1,6 +1,6 @@
 ---
 
-# Lab 10.4 – Secure Workloads Using Kubernetes Network Policies
+# Lab 10.3 – Secure Workloads Using Kubernetes Network Policies
 
 ## Objective
 
