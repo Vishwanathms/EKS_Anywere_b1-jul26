@@ -1,0 +1,562 @@
+
+```text
+nginx-gitops/
+│
+├── base/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── ingress.yaml
+│   ├── configmap.yaml
+│   ├── namespace.yaml
+│   └── kustomization.yaml
+│
+├── security/
+│   ├── serviceaccount.yaml
+│   ├── role.yaml
+│   ├── rolebinding.yaml
+│   ├── networkpolicy.yaml
+│   ├── podsecurity.md
+│   └── README.md
+│
+└── overlays/
+    └── production/
+```
+
+Everything students do will be committed to Git and synchronized by ArgoCD.
+
+---
+
+# LAB 10
+
+# Securing the GitOps Application
+
+## Objective
+
+In this lab, students will secure the NGINX application that was previously deployed using GitOps.
+
+The application will be enhanced with:
+
+* Dedicated Service Account
+* RBAC
+* Network Policies
+* Pod Security Standards
+* CIS Benchmark Validation
+
+All changes will be applied through GitHub and synchronized by ArgoCD.
+
+---
+
+# Step 1 – Verify Existing GitOps Deployment
+
+Verify ArgoCD Application.
+
+```bash
+kubectl get applications -n argocd
+```
+
+Expected
+
+```
+NAME          STATUS
+nginx-demo    Synced
+```
+
+Verify Pods
+
+```bash
+kubectl get pods -n production
+```
+
+Example
+
+```
+NAME
+nginx-demo-xxxxx
+```
+
+Verify Services
+
+```bash
+kubectl get svc -n production
+```
+
+Verify Application
+
+```bash
+kubectl get ingress -n production
+```
+
+The application should already be running.
+
+---
+
+# Step 2 – Create Security Directory
+
+Inside the Git repository
+
+```bash
+cd nginx-gitops
+
+mkdir security
+
+cd security
+```
+
+---
+
+# Step 3 – Create Dedicated Service Account
+
+Create
+
+serviceaccount.yaml
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+
+metadata:
+  name: nginx-sa
+  namespace: production
+```
+
+Commit later.
+
+---
+
+# Step 4 – Modify Deployment
+
+Edit
+
+```
+base/deployment.yaml
+```
+
+Locate
+
+```yaml
+spec:
+  template:
+    spec:
+```
+
+Add
+
+```yaml
+serviceAccountName: nginx-sa
+```
+
+Result
+
+```yaml
+spec:
+  template:
+    spec:
+      serviceAccountName: nginx-sa
+      containers:
+```
+
+---
+
+# Step 5 – Create RBAC Role
+
+Create
+
+role.yaml
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+
+kind: Role
+
+metadata:
+  name: nginx-reader
+  namespace: production
+
+rules:
+
+- apiGroups: [""]
+
+  resources:
+  - pods
+  - services
+
+  verbs:
+  - get
+  - list
+  - watch
+```
+
+Explanation
+
+The Service Account can
+
+✔ View Pods
+
+✔ View Services
+
+Cannot
+
+✖ Delete Pods
+
+✖ Create Pods
+
+✖ Modify Deployments
+
+---
+
+# Step 6 – Create RoleBinding
+
+rolebinding.yaml
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+
+kind: RoleBinding
+
+metadata:
+  name: nginx-binding
+  namespace: production
+
+subjects:
+
+- kind: ServiceAccount
+  name: nginx-sa
+  namespace: production
+
+roleRef:
+
+  kind: Role
+  name: nginx-reader
+  apiGroup: rbac.authorization.k8s.io
+```
+
+---
+
+# Step 7 – Update Kustomization
+
+If using Kustomize
+
+Edit
+
+```
+base/kustomization.yaml
+```
+
+Add
+
+```yaml
+resources:
+
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+- configmap.yaml
+
+- ../security/serviceaccount.yaml
+- ../security/role.yaml
+- ../security/rolebinding.yaml
+```
+
+If using Helm, add the templates under `templates/` and include values as appropriate.
+
+---
+
+# Step 8 – Commit to Git
+
+```bash
+git add .
+
+git commit -m "Added Service Account and RBAC"
+
+git push
+```
+
+---
+
+# Step 9 – Verify ArgoCD
+
+```bash
+kubectl get applications -n argocd
+```
+
+Watch Sync
+
+```bash
+kubectl get applications -n argocd -w
+```
+
+Expected
+
+```
+Synced
+
+Healthy
+```
+
+---
+
+# Step 10 – Verify Service Account
+
+```bash
+kubectl get sa -n production
+```
+
+Expected
+
+```
+NAME
+
+default
+
+nginx-sa
+```
+
+---
+
+# Step 11 – Verify Pod Uses Service Account
+
+```bash
+kubectl get pods -n production
+```
+
+Describe Pod
+
+```bash
+kubectl describe pod <pod-name> -n production
+```
+
+Expected
+
+```
+Service Account
+
+nginx-sa
+```
+
+---
+
+# Step 12 – Verify RBAC
+
+Test permissions
+
+```bash
+kubectl auth can-i get pods \
+--as=system:serviceaccount:production:nginx-sa \
+-n production
+```
+
+Expected
+
+```
+yes
+```
+
+Delete permission
+
+```bash
+kubectl auth can-i delete pods \
+--as=system:serviceaccount:production:nginx-sa \
+-n production
+```
+
+Expected
+
+```
+no
+```
+
+---
+
+# Step 13 – Implement Default Deny Network Policy
+
+Create
+
+networkpolicy.yaml
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: default-deny
+  namespace: production
+
+spec:
+  podSelector: {}
+
+  policyTypes:
+  - Ingress
+  - Egress
+```
+
+Update `kustomization.yaml` or Helm templates to include this manifest, then commit and push.
+
+---
+
+# Step 14 – Verify Network Policy
+
+Open a shell into the NGINX Pod.
+
+```bash
+kubectl exec -it deployment/nginx-demo \
+-n production \
+-- sh
+```
+
+Install curl (if available in the image, otherwise use a debug pod).
+
+Attempt communication to another service.
+
+Traffic should be blocked unless explicitly allowed.
+
+---
+
+# Step 15 – Allow Required Traffic
+
+Create
+
+allow-ingress.yaml
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: allow-nginx
+
+spec:
+
+  podSelector:
+
+    matchLabels:
+
+      app: nginx
+
+  ingress:
+
+  - {}
+
+  policyTypes:
+
+  - Ingress
+```
+
+Commit
+
+Push
+
+ArgoCD synchronizes automatically.
+
+---
+
+# Step 16 – Enable Pod Security Standards
+
+Label namespace
+
+```bash
+kubectl label namespace production \
+pod-security.kubernetes.io/enforce=restricted \
+--overwrite
+```
+
+Verify
+
+```bash
+kubectl get ns production --show-labels
+```
+
+---
+
+# Step 17 – Test Pod Security
+
+Deploy an intentionally insecure Pod.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-test
+  namespace: production
+spec:
+  containers:
+  - name: test
+    image: busybox
+    command: ["sleep","3600"]
+    securityContext:
+      privileged: true
+```
+
+Apply
+
+```bash
+kubectl apply -f privileged-test.yaml
+```
+
+Expected
+
+```
+Error from server
+
+violates PodSecurity "restricted"
+```
+
+Explain why the Pod was rejected.
+
+---
+
+# Step 18 – CIS Benchmark
+
+Install `kube-bench` on a control plane node (or run the official container if preferred for your environment).
+
+Example using the container image:
+
+```bash
+docker run --rm --pid=host \
+  -v /etc:/etc:ro \
+  -v /var:/var:ro \
+  -v /usr/bin:/usr/bin:ro \
+  aquasec/kube-bench:latest
+```
+
+Review the output.
+
+Focus on:
+
+* PASS
+* WARN
+* FAIL
+
+Discuss how findings map to API Server, Kubelet, RBAC, and node hardening.
+
+---
+
+# Step 19 – Validate GitOps Drift Protection
+
+Attempt a manual change.
+
+```bash
+kubectl scale deployment nginx-demo \
+-n production \
+--replicas=5
+```
+
+Observe ArgoCD.
+
+```bash
+kubectl get applications -n argocd
+```
+
+Within the configured sync interval (or after a manual sync), ArgoCD should restore the replica count defined in Git.
+
+---
+
+# Expected Deliverables
+
+At the end of the lab, students should have:
+
+* A dedicated Service Account attached to the application.
+* Least-privilege RBAC using a Role and RoleBinding.
+* Network Policies managed through Git.
+* Pod Security Standards enforced on the production namespace.
+* A CIS benchmark assessment completed and reviewed.
+* All security manifests version-controlled and reconciled by ArgoCD.
