@@ -1,0 +1,85 @@
+---
+- name: Install and expose ArgoCD on EKS Anywhere
+  hosts: localhost
+  gather_facts: false
+  vars:
+    kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') | default('/home/labuser/.kube/config', true) }}"
+    argocd_namespace: argocd
+    argocd_manifest_url: "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"
+    argocd_service_name: argocd-server
+
+  tasks:
+    - name: Validate kubectl is installed
+      ansible.builtin.command: kubectl version --client=true
+      changed_when: false
+
+    - name: Confirm cluster is reachable
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} cluster-info
+      changed_when: false
+      register: cluster_info
+      failed_when: "'Kubernetes control plane is running' not in cluster_info.stdout and 'Kubernetes control plane is running' not in cluster_info.stderr"
+
+    - name: Ensure ArgoCD namespace exists
+      ansible.builtin.shell: >
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ argocd_namespace }} --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+      changed_when: true
+
+    - name: Install ArgoCD
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} apply --server-side --force-conflicts -n {{ argocd_namespace }} -f {{ argocd_manifest_url }}
+      register: argocd_apply
+      changed_when: "'created' in argocd_apply.stdout or 'configured' in argocd_apply.stdout or 'unchanged' in argocd_apply.stdout"
+
+    - name: Wait for ArgoCD deployments to become available
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ argocd_namespace }} rollout status deployment/{{ item }} --timeout=300s
+      loop:
+        - argocd-server
+        - argocd-repo-server
+        - argocd-applicationset-controller
+        - argocd-notifications-controller
+      register: rollout_status
+      changed_when: false
+
+    - name: Expose ArgoCD server as LoadBalancer
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ argocd_namespace }} patch svc {{ argocd_service_name }} -p '{"spec":{"type":"LoadBalancer"}}' --type merge
+      register: patch_svc
+      changed_when: "'patched' in patch_svc.stdout.lower() or 'configured' in patch_svc.stdout.lower()"
+
+    - name: Wait for ArgoCD server service to receive an external IP
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ argocd_namespace }} get svc {{ argocd_service_name }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: argocd_ip
+      changed_when: false
+      retries: 30
+      delay: 10
+      until: argocd_ip.stdout | length > 0
+
+    - name: Get ArgoCD admin password
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ argocd_namespace }} get secret argocd-initial-admin-secret -o jsonpath='{.data.password}'
+      register: admin_secret_b64
+      changed_when: false
+
+    - name: Decode ArgoCD admin password
+      ansible.builtin.shell: >
+        echo '{{ admin_secret_b64.stdout }}' | base64 -d
+      register: admin_password
+      changed_when: false
+
+    - name: Display ArgoCD access details
+      ansible.builtin.debug:
+        msg:
+          - "ArgoCD URL: https://{{ argocd_ip.stdout }}"
+          - "Username: admin"
+          - "Password: {{ admin_password.stdout }}"
+          - "Namespace: {{ argocd_namespace }}"
+
+    - name: Verify ArgoCD pods are running
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ argocd_namespace }} get pods
+      register: pod_status
+      changed_when: false
+      failed_when: "'Running' not in pod_status.stdout"

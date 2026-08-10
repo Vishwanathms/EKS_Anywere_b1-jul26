@@ -1,0 +1,108 @@
+---
+- name: Install Loki and required lab dependencies
+  hosts: localhost
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+  vars:
+    kubeconfig_path: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+    monitoring_ns: monitoring
+    release_name: loki
+    repo_url: "https://grafana.github.io/helm-charts"
+    loki_service_name: "loki"
+
+  tasks:
+    - name: Ensure kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "KUBECONFIG is not configured or the file does not exist."
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Ensure monitoring namespace exists
+      ansible.builtin.shell: >
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ monitoring_ns }} --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+      changed_when: true
+
+    - name: Check if helm is installed
+      ansible.builtin.command: helm version --short
+      changed_when: false
+      register: helm_check
+      failed_when: helm_check.rc != 0
+
+    - name: Add Grafana Helm repo
+      ansible.builtin.command: helm repo add grafana {{ repo_url }}
+      changed_when: true
+
+    - name: Update Helm repos
+      ansible.builtin.command: helm repo update
+      changed_when: false
+
+    - name: Remove stale Loki release if present
+      ansible.builtin.command: helm uninstall {{ release_name }} -n {{ monitoring_ns }} --ignore-not-found
+      changed_when: false
+      register: loki_uninstall
+
+    - name: Delete Loki-related PVCs and leftover state
+      ansible.builtin.shell: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} delete pvc --all --ignore-not-found=true || true;
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} delete statefulset {{ release_name }} --ignore-not-found=true || true;
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} delete service {{ release_name }} --ignore-not-found=true || true;
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} delete daemonset loki-canary --ignore-not-found=true || true;
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} delete configmap {{ release_name }} {{ release_name }}-runtime --ignore-not-found=true || true
+      changed_when: true
+
+    - name: Install Loki in single-binary lab mode
+      ansible.builtin.shell: >
+        helm upgrade --install {{ release_name }} grafana/loki
+        --namespace {{ monitoring_ns }}
+        --create-namespace
+        --set deploymentMode=SingleBinary
+        --set singleBinary.replicas=1
+        --set singleBinary.persistence.enabled=false
+        --set ruler.enabled=false
+        --set chunksCache.enabled=false
+        --set resultsCache.enabled=false
+        --set read.replicas=0
+        --set write.replicas=0
+        --set backend.replicas=0
+        --set loki.useTestSchema=true
+        --set loki.storage.type=filesystem
+        --set loki.storage.filesystem.chunks_directory=/var/loki/chunks
+        --set loki.storage.filesystem.rules_directory=/var/loki/rules
+        --set loki.storage.bucketNames.chunks=chunks
+        --set loki.storage.bucketNames.ruler=ruler
+        --set singleBinary.service.type=LoadBalancer
+        --set singleBinary.service.port=3100
+        --set-json 'singleBinary.extraVolumes=[{"name":"var-loki","emptyDir":{}}]'
+        --set-json 'singleBinary.extraVolumeMounts=[{"name":"var-loki","mountPath":"/var/loki"}]'
+      register: loki_install
+      changed_when: "'installed' in loki_install.stdout.lower() or 'updated' in loki_install.stdout.lower()"
+
+    - name: Wait for Loki LoadBalancer IP
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get svc {{ loki_service_name }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: loki_lb_ip_result
+      changed_when: false
+      retries: 30
+      delay: 20
+      until: loki_lb_ip_result.stdout | length > 0
+
+    - name: Save discovered LoadBalancer IP
+      ansible.builtin.set_fact:
+        loki_lb_ip: "{{ loki_lb_ip_result.stdout }}"
+
+    - name: Show Loki objects
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get pods,svc,pvc
+      register: loki_status
+      changed_when: false
+
+    - name: Print Loki URL
+      ansible.builtin.debug:
+        msg:
+          - "Loki: http://{{ loki_lb_ip }}:3100"
+          - "Ready endpoint: http://{{ loki_lb_ip }}:3100/ready"

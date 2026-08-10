@@ -1,0 +1,110 @@
+---
+- name: Install Prometheus, Grafana, and Alertmanager
+  hosts: localhost
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+  vars:
+    kubeconfig_path: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+    monitoring_ns: monitoring
+    release_name: prometheus
+    repo_url: "https://prometheus-community.github.io/helm-charts"
+    prometheus_service_name: "prometheus-kube-prometheus-prometheus"
+    alertmanager_service_name: "prometheus-kube-prometheus-alertmanager"
+    grafana_service_name: "prometheus-grafana"
+
+  tasks:
+    - name: Ensure kubeconfig exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: Fail if kubeconfig missing
+      ansible.builtin.fail:
+        msg: "KUBECONFIG is not configured or the file does not exist."
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Ensure monitoring namespace exists
+      ansible.builtin.shell: >
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ monitoring_ns }} --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+      changed_when: true
+
+    - name: Check if helm is installed
+      ansible.builtin.command: helm version --short
+      changed_when: false
+      register: helm_check
+      failed_when: helm_check.rc != 0
+
+    - name: Add Prometheus Community Helm repo
+      ansible.builtin.command: helm repo add prometheus-community {{ repo_url }}
+      changed_when: true
+
+    - name: Update Helm repos
+      ansible.builtin.command: helm repo update
+      changed_when: false
+
+    - name: Install Prometheus stack with Grafana and Alertmanager
+      ansible.builtin.shell: >
+        helm upgrade --install {{ release_name }} prometheus-community/kube-prometheus-stack
+        --namespace {{ monitoring_ns }}
+        --create-namespace
+        --set prometheus.service.type=LoadBalancer
+        --set alertmanager.service.type=LoadBalancer
+        --set grafana.enabled=true
+        --set grafana.service.type=LoadBalancer
+        --set grafana.adminPassword=admin123
+      register: prom_install
+      changed_when: "'installed' in prom_install.stdout.lower() or 'updated' in prom_install.stdout.lower()"
+
+    - name: Wait for Prometheus LoadBalancer IP
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get svc {{ prometheus_service_name }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: prometheus_lb_ip_result
+      changed_when: false
+      retries: 30
+      delay: 20
+      until: prometheus_lb_ip_result.stdout | length > 0
+
+    - name: Wait for Alertmanager LoadBalancer IP
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get svc {{ alertmanager_service_name }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: alertmanager_lb_ip_result
+      changed_when: false
+      retries: 30
+      delay: 20
+      until: alertmanager_lb_ip_result.stdout | length > 0
+
+    - name: Wait for Grafana LoadBalancer IP
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get svc {{ grafana_service_name }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      register: grafana_lb_ip_result
+      changed_when: false
+      retries: 30
+      delay: 20
+      until: grafana_lb_ip_result.stdout | length > 0
+
+    - name: Save discovered LoadBalancer IPs
+      ansible.builtin.set_fact:
+        prometheus_lb_ip: "{{ prometheus_lb_ip_result.stdout }}"
+        alertmanager_lb_ip: "{{ alertmanager_lb_ip_result.stdout }}"
+        grafana_lb_ip: "{{ grafana_lb_ip_result.stdout }}"
+
+    - name: Show deployed services
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get svc
+      register: svc_list
+      changed_when: false
+
+    - name: Show pods
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ monitoring_ns }} get pods
+      register: pod_list
+      changed_when: false
+
+    - name: Print status summary
+      ansible.builtin.debug:
+        msg:
+          - "Prometheus: http://{{ prometheus_lb_ip }}:9090"
+          - "Alertmanager: http://{{ alertmanager_lb_ip }}:9093"
+          - "Grafana: http://{{ grafana_lb_ip }}:80"
+          - "Grafana login: admin / admin123"

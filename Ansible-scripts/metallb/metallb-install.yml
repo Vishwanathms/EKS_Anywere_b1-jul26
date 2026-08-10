@@ -1,0 +1,94 @@
+---
+- name: Install and configure MetalLB on EKS Anywhere
+  hosts: localhost
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+  vars:
+    kubeconfig_path: "{{ (lookup('env', 'KUBECONFIG') | default((lookup('env', 'HOME') | default('/root')) ~ '/.kube/config', true)) | expanduser }}"
+    metallb_namespace: metallb-system
+    metallb_version: v0.14.9
+    metallb_manifest_url: "https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml"
+    metallb_ip_pool_name: first-pool
+    metallb_ip_range: "192.168.230.XX-192.168.230.XX"  # Replace with your desired IP range for MetalLB
+
+  tasks:
+    - name: Ensure kubeconfig is set and exists
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: kubeconfig_stat
+
+    - name: Fail if kubeconfig is missing
+      ansible.builtin.fail:
+        msg: "KUBECONFIG is not set or the kubeconfig file does not exist. Export KUBECONFIG=/path/to/your/cluster-kubeconfig before running this playbook."
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Validate kubectl is installed
+      ansible.builtin.command: kubectl version --client=true
+      changed_when: false
+
+    - name: Verify cluster connectivity
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} cluster-info
+      changed_when: false
+      register: cluster_info
+      failed_when: "'Kubernetes control plane is running' not in cluster_info.stdout and 'Kubernetes control plane is running' not in cluster_info.stderr"
+
+    - name: Create MetalLB namespace
+      ansible.builtin.shell: >
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ metallb_namespace }} --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+      changed_when: true
+
+    - name: Install MetalLB
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f {{ metallb_manifest_url }}
+      register: metallb_apply
+      changed_when: "'created' in metallb_apply.stdout or 'configured' in metallb_apply.stdout or 'unchanged' in metallb_apply.stdout"
+
+    - name: Wait for MetalLB controller deployment
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ metallb_namespace }} rollout status deployment/controller --timeout=300s
+      changed_when: false
+
+    - name: Create MetalLB IP address pool
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ metallb_namespace }} apply -f -
+      args:
+        stdin: |
+          apiVersion: metallb.io/v1beta1
+          kind: IPAddressPool
+          metadata:
+            name: {{ metallb_ip_pool_name }}
+            namespace: {{ metallb_namespace }}
+          spec:
+            addresses:
+            - {{ metallb_ip_range }}
+      changed_when: true
+
+    - name: Create MetalLB L2 advertisement
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ metallb_namespace }} apply -f -
+      args:
+        stdin: |
+          apiVersion: metallb.io/v1beta1
+          kind: L2Advertisement
+          metadata:
+            name: default
+            namespace: {{ metallb_namespace }}
+          spec:
+            ipAddressPools:
+            - {{ metallb_ip_pool_name }}
+      changed_when: true
+
+    - name: Verify MetalLB resources
+      ansible.builtin.command: >
+        kubectl --kubeconfig={{ kubeconfig_path }} -n {{ metallb_namespace }} get pods,svc,ipaddresspool,l2advertisement
+      changed_when: false
+      register: metallb_verify
+
+    - name: Show MetalLB status
+      ansible.builtin.debug:
+        msg:
+          - "MetalLB installed in namespace: {{ metallb_namespace }}"
+          - "IP range: {{ metallb_ip_range }}"
+          - "Use this range for LoadBalancer services such as ArgoCD"
