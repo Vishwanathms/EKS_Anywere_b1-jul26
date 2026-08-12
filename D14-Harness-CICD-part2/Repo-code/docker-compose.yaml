@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NEW_RELIC_LICENSE_KEY=5fc43fed5d6fc74a7a4123ee019394daFFFFNRAL
+      - NEW_RELIC_APP_NAME=Flask-Redis-App
+      - NEW_RELIC_LOG=stdout
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    ports:
+      - "6379:6379"
