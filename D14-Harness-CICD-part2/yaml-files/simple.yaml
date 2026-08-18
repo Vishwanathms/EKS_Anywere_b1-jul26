@@ -1,0 +1,151 @@
+pipeline:
+  identifier: pythonredisci
+  name: python-redis-ci
+  projectIdentifier: eksanywhere
+  orgIdentifier: default
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: vishwanathms
+        build:
+          type: branch
+          spec:
+            branch: main
+  stages:
+    - stage:
+        identifier: Build_stage
+        type: CI
+        name: Build stage
+        description: ""
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: true
+          buildIntelligence:
+            enabled: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec:
+              harnessImageConnectorRef: account.harnessImage
+          execution:
+            steps:
+              - step:
+                  identifier: Run_1
+                  type: Run
+                  name: Run_1
+                  spec:
+                    shell: Sh
+                    command: |-
+                      echo "================================"
+                      echo "Harness CI Runner Test"
+                      echo "================================"
+
+                      echo "Hostname:"
+                      hostname
+
+                      echo "OS:"
+                      uname -a
+
+                      echo "Architecture:"
+                      uname -m
+
+                      echo "Docker:"
+                      docker --version
+
+                      echo "Current User:"
+                      whoami
+
+                      echo "Working Directory:"
+                      pwd
+
+                      echo "================================"
+                      echo "Runner is working!"
+                      echo "================================"
+        delegateSelectors:
+          - linux-amd64
+    - stage:
+        identifier: Buildpush
+        type: CI
+        name: Build-push
+        description: ""
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: true
+          buildIntelligence:
+            enabled: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec:
+              harnessImageConnectorRef: account.harnessImage
+          execution:
+            steps:
+              - step:
+                  identifier: BuildAndPushDockerRegistry_1
+                  type: BuildAndPushDockerRegistry
+                  name: BuildAndPushDockerRegistry_1
+                  spec:
+                    connectorRef: account.dockerhub
+                    repo: vishwacloudlab/py-feb26
+                    tags:
+                      - <+pipeline.sequenceId>
+                      - latest
+                    dockerfile: Dockerfile
+                    context: "."
+    - stage:
+        identifier: Update_Kubernetes_Manifest
+        type: CI
+        name: Update Kubernetes Manifest
+        description: ""
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+            override: true
+          buildIntelligence:
+            enabled: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Docker
+            spec:
+              harnessImageConnectorRef: account.harnessImage
+          execution:
+            steps:
+              - step:
+                  identifier: changeimagetaginmanifest
+                  type: Run
+                  name: change-image-tag-in-manifest
+                  spec:
+                    shell: Sh
+                    command: |-
+                      IMAGE_TAG="<+pipeline.sequenceId>"
+
+                      sed -i -E "s|(image:[[:space:]]*vishwacloudlab/py-feb26:)[^[:space:]]*|\1${IMAGE_TAG}|" python-kube/python-app.yaml
+
+                      echo "New image:"
+                      grep "image:" python-kube/python-app.yaml
+                  description: change-image-tag-in-manifest file
+              - step:
+                  identifier: Commit_Manifest
+                  type: Run
+                  name: Commit Manifest
+                  spec:
+                    shell: Sh
+                    command: |-
+                      git config user.name "Harness CI"
+                      git config user.email "harness-ci@local"
+                      git add python-kube/python-app.yaml
+                      git commit -m "Update Python image to <+pipeline.sequenceId>"
+
+                      git push origin HEAD:main
